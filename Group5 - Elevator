@@ -1,0 +1,122 @@
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <thread>
+#include <mutex>
+
+using namespace std;
+
+class Elevator {
+private:
+    int current_floor;              
+    vector<int> up_requests;        
+    vector<int> down_requests;      
+    mutex print_mutex;              
+
+public:
+    Elevator(int start_floor) : current_floor(start_floor) {}
+
+    // Request for the elevator (where it's called and where it should go)
+    void add_request(int call_floor, int destination_floor) {
+        if (destination_floor > call_floor) {
+            // Add the destination floors to the "up" list
+            up_requests.push_back(call_floor);
+            up_requests.push_back(destination_floor);
+            {
+                lock_guard<mutex> print_lock(print_mutex);
+                cout << "From floor " << call_floor
+                     << " to floor " << destination_floor << " (UP)\n";
+            }
+        } else if (destination_floor < call_floor) {
+            // Add the destination floors to the "down" list
+            down_requests.push_back(call_floor);
+            down_requests.push_back(destination_floor);
+            {
+                lock_guard<mutex> print_lock(print_mutex);
+                cout << "From floor " << call_floor
+                     << " to floor " << destination_floor << " (DOWN)\n";
+            }
+        }
+    }
+
+    // Handle all the elevator requests
+    void process_requests() {
+        {
+            lock_guard<mutex> print_lock(print_mutex);
+            cout << "\nElevator starting at floor " << current_floor << "\n";
+        }
+
+        
+        sort(up_requests.begin(), up_requests.end());
+        up_requests.erase(unique(up_requests.begin(), up_requests.end()), up_requests.end());
+        sort(down_requests.begin(), down_requests.end(), greater<int>());
+        down_requests.erase(unique(down_requests.begin(), down_requests.end()), down_requests.end());
+
+        // Decide whether to handle "down" or "up" requests first
+        if (!down_requests.empty() && current_floor >= down_requests[0]) {
+            
+            for (int floor : down_requests) {
+                move_to(floor);
+            }
+            
+            for (int floor : up_requests) {
+                move_to(floor);
+            }
+        } else {
+            
+            for (int floor : up_requests) {
+                move_to(floor);
+            }
+            
+            for (int floor : down_requests) {
+                move_to(floor);
+            }
+        }
+    }
+
+    // Move the elevator to a specific floor
+    void move_to(int floor) {
+        if (current_floor != floor) {
+            {
+                lock_guard<mutex> print_lock(print_mutex);
+                cout << "Elevator moving to floor " << floor << "\n";
+            }
+            current_floor = floor;
+        }
+    }
+};
+
+int main() {
+    int start_floor;
+    cout << "Enter the starting floor of the elevator (1-9): ";
+    cin >> start_floor;
+
+    Elevator elevator(start_floor);
+
+    int num_users;
+    // Sets the number of users with maximum of 5
+    do {
+        cout << "\nEnter the number of users (max 5): ";
+        cin >> num_users;
+
+        if (num_users > 5) {
+            cout << "Please enter a number less than or equal to 5.\n";
+        }
+
+    } while (num_users > 5);
+
+    // Collect user requests
+    for (int i = 1; i <= num_users; ++i) {
+        int call_floor, destination_floor;
+        cout << "\nUser" << i << " calls the elevator at floor: ";
+        cin >> call_floor;
+        cout << "Enter User" << i << " destination floor: ";
+        cin >> destination_floor;
+
+        elevator.add_request(call_floor, destination_floor);
+    }
+
+    elevator.process_requests();
+
+    return 0;
+}
